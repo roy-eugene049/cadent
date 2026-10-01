@@ -13,6 +13,7 @@ final class AppModel {
     let library: RecordingLibrary
     let recorder: ReminderRecorder
     let player: ReminderPlayer
+    let scheduler: BreakScheduler
 
     private(set) var loginItemMessage: String?
     private var settingsWindow: NSWindow?
@@ -22,15 +23,27 @@ final class AppModel {
         let library = RecordingLibrary()
         let recorder = ReminderRecorder()
         let player = ReminderPlayer()
+        let scheduler = BreakScheduler(settings: settings)
         self.settings = settings
         self.library = library
         self.recorder = recorder
         self.player = player
+        self.scheduler = scheduler
         Self.current = self
+
+        scheduler.onFire = { [weak self] in
+            self?.noteBreakDue()
+        }
+        scheduler.isBreakVisible = { false }
+        scheduler.start()
         Log.info("model init")
         #if DEBUG
         applyDebugArguments()
         #endif
+    }
+
+    var hasPlayableReminder: Bool {
+        settings.hasPlayableReminder { library.fileExists($0) }
     }
 
     var launchAtLogin: Bool {
@@ -57,6 +70,18 @@ final class AppModel {
         loginItemMessage = loginMessage(for: SMAppService.mainApp.status)
     }
 
+    func pause() {
+        scheduler.pause()
+    }
+
+    func resume() {
+        scheduler.resume()
+    }
+
+    func stretchNow() {
+        noteBreakDue()
+    }
+
     func openSettings() {
         NSApp.activate(ignoringOtherApps: true)
         let window = settingsWindow ?? makeSettingsWindow()
@@ -66,8 +91,25 @@ final class AppModel {
     }
 
     func shutdown() {
+        scheduler.stop()
         recorder.stop()
         player.stop()
+    }
+
+    #if DEBUG
+    func debugArmShort() {
+        scheduler.arm(after: 10)
+    }
+    #endif
+
+    private func noteBreakDue() {
+        guard let reminder = settings.consumeNextPlayable(fileExists: { library.fileExists($0) }) else {
+            Log.info("break skipped, no recording")
+            scheduler.armNextInterval()
+            return
+        }
+        Log.info("break due \(reminder.title)")
+        scheduler.armNextInterval()
     }
 
     private func makeSettingsWindow() -> NSWindow {
@@ -126,6 +168,17 @@ final class AppModel {
                 continue
             }
             argumentIndex += 1
+        }
+        if arguments.contains("--arm-10") {
+            scheduler.arm(after: 10)
+        }
+        if arguments.contains("--pause") {
+            pause()
+        }
+        if arguments.contains("--stretch-now") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
+                self?.stretchNow()
+            }
         }
         if arguments.contains("--open-settings") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
