@@ -29,6 +29,9 @@ swiftc \
   Cadent/Audio/ReminderRecorder.swift \
   Cadent/Audio/ReminderPlayer.swift \
   Cadent/Scheduler/BreakScheduler.swift \
+  Cadent/Overlay/OverlayPanel.swift \
+  Cadent/Overlay/OverlayController.swift \
+  Cadent/Overlay/OverlayView.swift \
   Cadent/AppModel.swift \
   Cadent/Settings/SettingsView.swift \
   Cadent/CadentApp.swift
