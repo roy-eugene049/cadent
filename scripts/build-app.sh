@@ -24,7 +24,9 @@ swiftc \
   -framework CoreAudio \
   -o "$MACOS/Cadent" \
   Cadent/Log.swift \
+  Cadent/Settings/SettingsStore.swift \
   Cadent/AppModel.swift \
+  Cadent/Settings/SettingsView.swift \
   Cadent/CadentApp.swift
 
 codesign --force --sign - --entitlements Cadent/Cadent.entitlements "$APP"

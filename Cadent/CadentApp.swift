@@ -31,7 +31,9 @@ struct MenuBarContent: View {
     var model: AppModel
 
     var body: some View {
-        Text("Cadent")
+        Button("Settings…") {
+            model.openSettings()
+        }
         Divider()
         Button("Quit Cadent") {
             model.shutdown()
