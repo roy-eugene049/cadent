@@ -1,0 +1,33 @@
+name: Cadent
+options:
+  createIntermediateGroups: true
+  deploymentTarget:
+    macOS: "14.0"
+settings:
+  SWIFT_VERSION: "6.0"
+  MACOSX_DEPLOYMENT_TARGET: "14.0"
+targets:
+  Cadent:
+    type: application
+    platform: macOS
+    deploymentTarget: "14.0"
+    sources:
+      - path: Cadent
+        excludes:
+          - Info.plist
+          - Cadent.entitlements
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.dukaloco.cadent
+      PRODUCT_NAME: Cadent
+      GENERATE_INFOPLIST_FILE: NO
+      INFOPLIST_FILE: Cadent/Info.plist
+      CODE_SIGN_ENTITLEMENTS: Cadent/Cadent.entitlements
+      CODE_SIGN_STYLE: Automatic
+      ENABLE_HARDENED_RUNTIME: YES
+      ENABLE_APP_SANDBOX: NO
+      SWIFT_VERSION: "6.0"
+      MACOSX_DEPLOYMENT_TARGET: "14.0"
+      MARKETING_VERSION: "1.0"
+      CURRENT_PROJECT_VERSION: "1"
+    scheme:
+      configVariants: []
