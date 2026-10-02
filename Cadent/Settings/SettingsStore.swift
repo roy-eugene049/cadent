@@ -33,6 +33,8 @@ struct StoredSettings: Codable, Equatable {
 @MainActor
 @Observable
 final class SettingsStore {
+    static let maximumIntervalMinutes = 24 * 60
+
     private let defaults: UserDefaults
     private let storageKey = "cadent.settings.v1"
     private let encoder: JSONEncoder = {
@@ -50,12 +52,15 @@ final class SettingsStore {
 
     var intervalMinutes: Int {
         get { settings.intervalMinutes }
-        set { settings.intervalMinutes = min(180, max(1, newValue)); save() }
+        set {
+            settings.intervalMinutes = min(Self.maximumIntervalMinutes, max(1, newValue))
+            save()
+        }
     }
 
     var snoozeMinutes: Int {
         get { settings.snoozeMinutes }
-        set { settings.snoozeMinutes = min(60, max(1, newValue)); save() }
+        set { settings.snoozeMinutes = min(240, max(1, newValue)); save() }
     }
 
     var autoDismissSeconds: Int {

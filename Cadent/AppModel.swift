@@ -89,6 +89,14 @@ final class AppModel {
         scheduler.resume()
     }
 
+    func setPreferredInterval(hours: Int, minutes: Int) {
+        let previous = settings.intervalMinutes
+        settings.intervalMinutes = (hours * 60) + minutes
+        guard settings.intervalMinutes != previous else { return }
+        guard !settings.paused, !isPresentingBreak else { return }
+        scheduler.armNextInterval()
+    }
+
     func stretchNow() {
         guard hasPlayableReminder else {
             Log.info("stretch now skipped, no recording")
@@ -136,8 +144,8 @@ final class AppModel {
         let window = NSWindow(contentViewController: host)
         window.title = "Cadent"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 560, height: 680))
-        window.minSize = NSSize(width: 480, height: 420)
+        window.setContentSize(NSSize(width: 620, height: 760))
+        window.minSize = NSSize(width: 560, height: 520)
         window.isReleasedWhenClosed = false
         settingsWindow = window
         return window
