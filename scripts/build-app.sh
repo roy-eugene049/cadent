@@ -28,6 +28,7 @@ swiftc \
   Cadent/Audio/RecordingLibrary.swift \
   Cadent/Audio/ReminderRecorder.swift \
   Cadent/Audio/ReminderPlayer.swift \
+  Cadent/Scheduler/BreakScheduler.swift \
   Cadent/AppModel.swift \
   Cadent/Settings/SettingsView.swift \
   Cadent/CadentApp.swift
