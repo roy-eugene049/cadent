@@ -14,7 +14,11 @@ final class AppModel {
     let recorder: ReminderRecorder
     let player: ReminderPlayer
     let scheduler: BreakScheduler
+    let overlay: OverlayController
 
+    private(set) var isPresentingBreak = false
+    private(set) var isPlaying = false
+    private(set) var playFailed = false
     private(set) var loginItemMessage: String?
     private var settingsWindow: NSWindow?
 
@@ -23,18 +27,25 @@ final class AppModel {
         let library = RecordingLibrary()
         let recorder = ReminderRecorder()
         let player = ReminderPlayer()
+        let overlay = OverlayController()
         let scheduler = BreakScheduler(settings: settings)
         self.settings = settings
         self.library = library
         self.recorder = recorder
         self.player = player
+        self.overlay = overlay
         self.scheduler = scheduler
         Self.current = self
 
-        scheduler.onFire = { [weak self] in
-            self?.noteBreakDue()
+        player.onChange = { [weak self] in
+            self?.syncPlayback()
         }
-        scheduler.isBreakVisible = { false }
+        scheduler.onFire = { [weak self] in
+            self?.presentNextBreak()
+        }
+        scheduler.isBreakVisible = { [weak self] in
+            self?.isPresentingBreak ?? false
+        }
         scheduler.start()
         Log.info("model init")
         #if DEBUG
@@ -79,37 +90,45 @@ final class AppModel {
     }
 
     func stretchNow() {
-        noteBreakDue()
+        guard hasPlayableReminder else {
+            Log.info("stretch now skipped, no recording")
+            return
+        }
+        presentNextBreak()
+    }
+
+    func finishBreak() {
+        guard isPresentingBreak else { return }
+        isPresentingBreak = false
+        overlay.dismiss()
+        player.stop()
+        Log.info("dismiss")
+        guard !settings.paused else { return }
+        scheduler.armNextInterval()
+    }
+
+    func snoozeBreak() {
+        guard isPresentingBreak else { return }
+        isPresentingBreak = false
+        overlay.dismiss()
+        player.stop()
+        Log.info("snooze")
+        guard !settings.paused else { return }
+        scheduler.snooze()
     }
 
     func openSettings() {
         NSApp.activate(ignoringOtherApps: true)
         let window = settingsWindow ?? makeSettingsWindow()
-        place(window, on: screenContainingMouse())
+        if let screen = OverlayController.screenContainingMouse() {
+            let visible = screen.visibleFrame
+            let size = window.frame.size
+            window.setFrameOrigin(
+                NSPoint(x: visible.midX - size.width / 2, y: visible.midY - size.height / 2)
+            )
+        }
         window.makeKeyAndOrderFront(nil)
         Log.info("settings frame \(NSStringFromRect(window.frame))")
-    }
-
-    func shutdown() {
-        scheduler.stop()
-        recorder.stop()
-        player.stop()
-    }
-
-    #if DEBUG
-    func debugArmShort() {
-        scheduler.arm(after: 10)
-    }
-    #endif
-
-    private func noteBreakDue() {
-        guard let reminder = settings.consumeNextPlayable(fileExists: { library.fileExists($0) }) else {
-            Log.info("break skipped, no recording")
-            scheduler.armNextInterval()
-            return
-        }
-        Log.info("break due \(reminder.title)")
-        scheduler.armNextInterval()
     }
 
     private func makeSettingsWindow() -> NSWindow {
@@ -124,18 +143,53 @@ final class AppModel {
         return window
     }
 
-    private func place(_ window: NSWindow, on screen: NSScreen?) {
-        guard let screen else { return }
-        let visible = screen.visibleFrame
-        let size = window.frame.size
-        window.setFrameOrigin(
-            NSPoint(x: visible.midX - size.width / 2, y: visible.midY - size.height / 2)
-        )
+    func shutdown() {
+        scheduler.stop()
+        recorder.stop()
+        player.stop()
+        overlay.dismiss()
     }
 
-    private func screenContainingMouse() -> NSScreen? {
-        let mouse = NSEvent.mouseLocation
-        return NSScreen.screens.first { $0.frame.contains(mouse) } ?? NSScreen.main
+    #if DEBUG
+    func debugArmShort() {
+        scheduler.arm(after: 10)
+    }
+    #endif
+
+    private func presentNextBreak() {
+        guard let reminder = settings.consumeNextPlayable(fileExists: { library.fileExists($0) }) else {
+            Log.info("break skipped, no recording")
+            if !isPresentingBreak {
+                scheduler.armNextInterval()
+            }
+            return
+        }
+        guard let screen = OverlayController.screenContainingMouse() ?? NSScreen.screens.first else {
+            scheduler.armNextInterval()
+            return
+        }
+        isPresentingBreak = true
+        playFailed = false
+        player.play(url: library.url(for: reminder))
+        overlay.show(
+            screen: screen,
+            autoDismiss: TimeInterval(settings.autoDismissSeconds),
+            onDone: { [weak self] in
+                self?.finishBreak()
+            },
+            content: OverlayView(
+                model: self,
+                title: reminder.title,
+                snoozeMinutes: settings.snoozeMinutes
+            )
+        )
+        Log.info("show \(reminder.title)")
+        scheduler.armNextInterval()
+    }
+
+    private func syncPlayback() {
+        isPlaying = player.isPlaying
+        playFailed = player.lastError != nil && !player.isPlaying
     }
 
     private func loginMessage(for status: SMAppService.Status) -> String? {
@@ -178,6 +232,11 @@ final class AppModel {
         if arguments.contains("--stretch-now") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) { [weak self] in
                 self?.stretchNow()
+            }
+        }
+        if arguments.contains("--snooze-after-show") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.1) { [weak self] in
+                self?.snoozeBreak()
             }
         }
         if arguments.contains("--open-settings") {
