@@ -25,6 +25,9 @@ swiftc \
   -o "$MACOS/Cadent" \
   Cadent/Log.swift \
   Cadent/Settings/SettingsStore.swift \
+  Cadent/Audio/RecordingLibrary.swift \
+  Cadent/Audio/ReminderRecorder.swift \
+  Cadent/Audio/ReminderPlayer.swift \
   Cadent/AppModel.swift \
   Cadent/Settings/SettingsView.swift \
   Cadent/CadentApp.swift

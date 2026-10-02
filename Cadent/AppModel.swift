@@ -10,13 +10,27 @@ final class AppModel {
     static weak var current: AppModel?
 
     let settings: SettingsStore
+    let library: RecordingLibrary
+    let recorder: ReminderRecorder
+    let player: ReminderPlayer
+
     private(set) var loginItemMessage: String?
     private var settingsWindow: NSWindow?
 
     init() {
-        settings = SettingsStore()
+        let settings = SettingsStore()
+        let library = RecordingLibrary()
+        let recorder = ReminderRecorder()
+        let player = ReminderPlayer()
+        self.settings = settings
+        self.library = library
+        self.recorder = recorder
+        self.player = player
         Self.current = self
         Log.info("model init")
+        #if DEBUG
+        applyDebugArguments()
+        #endif
     }
 
     var launchAtLogin: Bool {
@@ -51,15 +65,18 @@ final class AppModel {
         Log.info("settings frame \(NSStringFromRect(window.frame))")
     }
 
-    func shutdown() {}
+    func shutdown() {
+        recorder.stop()
+        player.stop()
+    }
 
     private func makeSettingsWindow() -> NSWindow {
         let host = NSHostingController(rootView: SettingsView(model: self))
         let window = NSWindow(contentViewController: host)
         window.title = "Cadent"
         window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
-        window.setContentSize(NSSize(width: 560, height: 420))
-        window.minSize = NSSize(width: 480, height: 320)
+        window.setContentSize(NSSize(width: 560, height: 680))
+        window.minSize = NSSize(width: 480, height: 420)
         window.isReleasedWhenClosed = false
         settingsWindow = window
         return window
@@ -91,4 +108,30 @@ final class AppModel {
             nil
         }
     }
+
+    #if DEBUG
+    private func applyDebugArguments() {
+        let arguments = CommandLine.arguments
+        var argumentIndex = 0
+        while argumentIndex < arguments.count {
+            if arguments[argumentIndex] == "--import-sample", arguments.indices.contains(argumentIndex + 1) {
+                let url = URL(fileURLWithPath: arguments[argumentIndex + 1])
+                do {
+                    _ = try library.importFile(at: url, title: url.deletingPathExtension().lastPathComponent, into: settings)
+                    Log.info("imported sample")
+                } catch {
+                    Log.error("import failed \(error.localizedDescription)")
+                }
+                argumentIndex += 2
+                continue
+            }
+            argumentIndex += 1
+        }
+        if arguments.contains("--open-settings") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                self?.openSettings()
+            }
+        }
+    }
+    #endif
 }
