@@ -3,6 +3,7 @@ import SwiftUI
 struct OverlayView: View {
     var model: AppModel
     let title: String
+    let voiceName: String
     let snoozeMinutes: Int
 
     var body: some View {
@@ -39,7 +40,7 @@ struct OverlayView: View {
         if model.playFailed {
             "Couldn't play this recording."
         } else if model.isPlaying {
-            "Playing your reminder"
+            "Playing \(voiceName)"
         } else {
             "Take a moment to stretch"
         }

@@ -43,7 +43,7 @@ struct MenuBarContent: View {
         }
         .disabled(!model.hasPlayableReminder)
         if !model.hasPlayableReminder {
-            Text("Record a reminder in Settings.")
+            Text("Add a voice in Settings, then attach it to a reminder.")
         }
         if model.settings.paused {
             Text("Paused")
