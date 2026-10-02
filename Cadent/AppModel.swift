@@ -165,7 +165,7 @@ final class AppModel {
     #endif
 
     private func presentNextBreak() {
-        guard let reminder = settings.consumeNextPlayable(fileExists: { library.fileExists($0) }) else {
+        guard let cue = settings.consumeNextPlayable(fileExists: { library.fileExists($0) }) else {
             Log.info("break skipped, no recording")
             if !isPresentingBreak {
                 scheduler.armNextInterval()
@@ -178,7 +178,7 @@ final class AppModel {
         }
         isPresentingBreak = true
         playFailed = false
-        player.play(url: library.url(for: reminder))
+        player.play(url: library.url(for: cue.voice))
         overlay.show(
             screen: screen,
             autoDismiss: TimeInterval(settings.autoDismissSeconds),
@@ -187,11 +187,12 @@ final class AppModel {
             },
             content: OverlayView(
                 model: self,
-                title: reminder.title,
+                title: cue.reminder.title,
+                voiceName: cue.voice.name,
                 snoozeMinutes: settings.snoozeMinutes
             )
         )
-        Log.info("show \(reminder.title)")
+        Log.info("show \(cue.reminder.title) voice \(cue.voice.name)")
         scheduler.armNextInterval()
     }
 

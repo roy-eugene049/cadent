@@ -16,12 +16,12 @@ final class RecordingLibrary {
         try? fileManager.createDirectory(at: base, withIntermediateDirectories: true)
     }
 
-    func url(for reminder: Reminder) -> URL {
-        recordingsDirectory.appendingPathComponent(reminder.fileName)
+    func url(for voice: VoiceClip) -> URL {
+        recordingsDirectory.appendingPathComponent(voice.fileName)
     }
 
-    func fileExists(_ reminder: Reminder) -> Bool {
-        FileManager.default.fileExists(atPath: url(for: reminder).path)
+    func fileExists(_ voice: VoiceClip) -> Bool {
+        FileManager.default.fileExists(atPath: url(for: voice).path)
     }
 
     func prepareDraft() -> URL {
@@ -37,9 +37,9 @@ final class RecordingLibrary {
         }
     }
 
-    /// Moves the draft onto the reminder's file name and returns the clip duration.
-    func adoptDraft(for reminder: Reminder) throws -> TimeInterval {
-        let destination = url(for: reminder)
+    /// Moves the draft onto the voice's file name and returns the clip duration.
+    func adoptDraft(for voice: VoiceClip) throws -> TimeInterval {
+        let destination = url(for: voice)
         if FileManager.default.fileExists(atPath: destination.path) {
             try FileManager.default.removeItem(at: destination)
         }
@@ -47,8 +47,8 @@ final class RecordingLibrary {
         return duration(of: destination)
     }
 
-    func deleteFile(for reminder: Reminder) {
-        let url = url(for: reminder)
+    func deleteFile(for voice: VoiceClip) {
+        let url = url(for: voice)
         if FileManager.default.fileExists(atPath: url.path) {
             try? FileManager.default.removeItem(at: url)
         }
@@ -59,19 +59,21 @@ final class RecordingLibrary {
         return player.duration
     }
 
-    func importFile(at source: URL, title: String, into settings: SettingsStore) throws -> Reminder {
-        let reminder = settings.addReminder(title: title, duration: 0)
-        let destination = url(for: reminder)
+    func importFile(at source: URL, title: String, into settings: SettingsStore) throws -> VoiceClip {
+        let voice = settings.addVoice(name: title, duration: 0)
+        let destination = url(for: voice)
         do {
             if FileManager.default.fileExists(atPath: destination.path) {
                 try FileManager.default.removeItem(at: destination)
             }
             try FileManager.default.copyItem(at: source, to: destination)
         } catch {
-            settings.remove(id: reminder.id)
+            settings.removeVoice(id: voice.id)
             throw error
         }
-        settings.updateDuration(id: reminder.id, duration: duration(of: destination))
-        return reminder
+        settings.updateVoiceDuration(id: voice.id, duration: duration(of: destination))
+        let reminder = settings.addReminder(title: title)
+        settings.setVoiceAttached(voice.id, to: reminder.id, attached: true)
+        return voice
     }
 }
