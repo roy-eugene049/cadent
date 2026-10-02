@@ -2,6 +2,11 @@ import SwiftUI
 
 struct SettingsView: View {
     var model: AppModel
+    @State private var hoursText = "0"
+    @State private var minutesText = "30"
+    @State private var snoozeText = "5"
+    @State private var dismissDraft = 60
+    @FocusState private var focusedTime: TimeField?
     @State private var draftTitle = ""
     @State private var phase: RecordPhase = .idle
     @State private var message: String?
@@ -11,14 +16,40 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section("Schedule") {
-                Stepper(value: intervalBinding, in: 1...180) {
-                    Text("Every \(model.settings.intervalMinutes) min")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Break every")
+                    HStack(spacing: 10) {
+                        timeField($hoursText, focus: .hours)
+                        Text("hours")
+                        timeField($minutesText, focus: .minutes)
+                        Text("minutes")
+                    }
+                    Text("Type any length up to 24 hours. \(intervalSummary)")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Stepper(value: snoozeBinding, in: 1...60) {
-                    Text("Snooze \(model.settings.snoozeMinutes) min")
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Snooze")
+                    HStack(spacing: 10) {
+                        timeField($snoozeText, focus: .snooze)
+                        Text("minutes")
+                    }
                 }
-                Stepper(value: dismissBinding, in: 15...300, step: 15) {
-                    Text("Card stays \(model.settings.autoDismissSeconds) sec")
+                Stepper(value: $dismissDraft, in: 15...300, step: 15) {
+                    Text("Card stays \(dismissDraft) sec")
+                }
+                HStack {
+                    Button("Save") {
+                        saveSchedule()
+                    }
+                    .disabled(!scheduleIsDirty)
+                    .buttonStyle(.borderedProminent)
+                    if scheduleIsDirty {
+                        Text("Save to use your new times.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 Toggle("Launch at login", isOn: launchBinding)
                 if let loginItemMessage = model.loginItemMessage {
@@ -54,8 +85,11 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(minWidth: 520, minHeight: 560)
-        .onAppear { model.refreshLoginItemStatus() }
+        .frame(minWidth: 560, minHeight: 640)
+        .onAppear {
+            syncTimeFields()
+            model.refreshLoginItemStatus()
+        }
         .onChange(of: model.recorder.isRecording) { _, recording in
             guard reRecord == nil else { return }
             movePhaseAfterRecording(recording)
@@ -211,25 +245,66 @@ struct SettingsView: View {
         )
     }
 
-    private var intervalBinding: Binding<Int> {
-        Binding(
-            get: { model.settings.intervalMinutes },
-            set: { model.settings.intervalMinutes = $0 }
-        )
+    private func timeField(_ text: Binding<String>, focus: TimeField) -> some View {
+        TextField("", text: text, prompt: Text("0"))
+            .textFieldStyle(.roundedBorder)
+            .labelsHidden()
+            .multilineTextAlignment(.trailing)
+            .frame(width: 72)
+            .focused($focusedTime, equals: focus)
+            .onSubmit { saveSchedule() }
     }
 
-    private var snoozeBinding: Binding<Int> {
-        Binding(
-            get: { model.settings.snoozeMinutes },
-            set: { model.settings.snoozeMinutes = $0 }
-        )
+    private var intervalSummary: String {
+        let total = model.settings.intervalMinutes
+        let hours = total / 60
+        let minutes = total % 60
+        if hours == 0 {
+            return "Cadent will remind you every \(minutes) min."
+        }
+        if minutes == 0 {
+            return "Cadent will remind you every \(hours) h."
+        }
+        return "Cadent will remind you every \(hours) h \(minutes) min."
     }
 
-    private var dismissBinding: Binding<Int> {
-        Binding(
-            get: { model.settings.autoDismissSeconds },
-            set: { model.settings.autoDismissSeconds = $0 }
-        )
+    private var scheduleIsDirty: Bool {
+        guard let draft = scheduleDraft else { return false }
+        return draft.interval != model.settings.intervalMinutes
+            || draft.snooze != model.settings.snoozeMinutes
+            || dismissDraft != model.settings.autoDismissSeconds
+    }
+
+    private var scheduleDraft: (interval: Int, snooze: Int)? {
+        let hours = Int(hoursText.trimmingCharacters(in: .whitespaces))
+        let minutes = Int(minutesText.trimmingCharacters(in: .whitespaces))
+        let snooze = Int(snoozeText.trimmingCharacters(in: .whitespaces))
+        guard let hours, let minutes, let snooze, hours >= 0, minutes >= 0, snooze > 0 else {
+            return nil
+        }
+        let interval = min(SettingsStore.maximumIntervalMinutes, max(1, (hours * 60) + minutes))
+        return (interval, min(240, snooze))
+    }
+
+    private func syncTimeFields() {
+        let total = model.settings.intervalMinutes
+        hoursText = String(total / 60)
+        minutesText = String(total % 60)
+        snoozeText = String(model.settings.snoozeMinutes)
+        dismissDraft = model.settings.autoDismissSeconds
+    }
+
+    private func saveSchedule() {
+        guard let draft = scheduleDraft else {
+            syncTimeFields()
+            return
+        }
+        let hours = draft.interval / 60
+        let minutes = draft.interval % 60
+        model.setPreferredInterval(hours: hours, minutes: minutes)
+        model.settings.snoozeMinutes = draft.snooze
+        model.settings.autoDismissSeconds = dismissDraft
+        syncTimeFields()
     }
 
     private var launchBinding: Binding<Bool> {
@@ -338,6 +413,12 @@ private enum RecordPhase {
     case idle
     case recording
     case preview
+}
+
+private enum TimeField: Hashable {
+    case hours
+    case minutes
+    case snooze
 }
 
 private func voiceDuration(_ duration: TimeInterval) -> String {
